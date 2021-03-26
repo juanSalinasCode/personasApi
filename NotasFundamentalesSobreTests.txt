@@ -1,0 +1,89 @@
+# 1-personaAPI
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+Consideraciones al momento de armar un Test:
+	
+	1) TEST unitarios => son independientes > no hay relación entre ellos => no se debe hacer un testA y luego invocarlo desde un testB.
+	 
+		Por lo tanto, escribir un test no hará que falle otro (SON INDEPENDIENTES).
+	 
+	 
+	2) A la clase que contiene el SUT (método que se está probando) no se le debe agregar código extra fuera de la implementación del SUT para q pase el Test. 
+	 
+		El motivo es que en la clase final no debe quedar código basura (algo q solo se usa en los tests) 
+	 
+	 
+	3) Los TEST de una capa, solo deben llamar a métodos de esa capa. 
+	
+		a) Los TEST del Controller solo deben llamar a métodos de la Capa Controller. 
+		
+		Pero si en la implementación se llama al Business ?, entonces que se hace para que no lo llame (si NO DEBO alterar el código del Business) ?
+	 
+	 		RTA: Se intercepta ese llamado que se hace al Business (desde el Controller) y se simula su respuesta por medio de JMockito (Mockear ese llamado).
+	 			
+	 			Ejemplos en la implementación del Test de Controller:
+	 				@MockBean  // esta anotación se encarga de interceptar todos los llamado a la clase que está "anotando" (en este caso: PersonaBusiness) desde la clase PersonaController
+					private PersonaBusiness personaBusinessMock;
+	 			
+	 				1) Mockito.when(personaBusiness.listar()).thenReturn(null); // si se desea simular q personaBusinessMock.listar() devuelva una lista null
+	 				 
+	 				2) Mockito.when(personaBusiness.listar()).thenReturn(new ArrayList<>()); // si se desea simular q personaBusinessMock.listar() devuelva una lista vacía
+	 			
+	 				3) Mockito.when(personaBusiness.listar()).thenReturn(listarConDatos()); // si se desea simular q personaBusinessMock.listar() devuelva una lista con datos válidos
+	 				 
+	 		Por lo tanto, si se pone un un breakpoint en el Business y es llamado => el TEST ESTA MAL !.
+	 			
+	 			Ejemplo: 
+	 				* Se desea probar personaController.listar() 
+	 				* en la clase PersonaBusiness => método listar() => se pone un breakPoint en la linea "return personaDAO.listar();" 
+	 				
+	 				=> si se corre el Test en modo DEBUG y ese breakpoint es llamado => ese TEST ESTA MAL !!!. 
+	 				
+	 				SOLUCION: Hay interceptar ese llamado que se hace al Business (desde el Controller) y simular su respuesta por medio de JMockito. 
+	 				
+		b) Los TEST del Business solo deben llamar a métodos de la Capa Business.
+		
+			@MockBean  // esta anotación se encarga de interceptar todos los llamado a la clase que está "anotando" (en este caso: PersonaDAO) desde la clase PersonaBusiness
+			private PersonaDAO personaDAOMock;
+		
+		
+		c) Los TEST del DAO solo deben llamar a métodos de la Capa DAO.
+		
+			@MockBean  // esta anotación se encarga de interceptar todos los llamado a la clase que está "anotando" (en este caso: PersonaMock) desde la clase PersonaDAO
+			private PersonaMock personaMockMock;	 					
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+Armando el Test
+	
+	1. Se deberán probar TODOS los métodos públicos de la clase, excepto los q son triviales (el 100% de las veces no fallan: getters/setters u otros simples)
+   	
+		NOTA: no tiene sentido probar los Métodos privados, ya que son probados de forma implícita por el/los público/s que lo invocan.	
+
+  
+	2. Buscar el DOMINIO de cada Test.
+  
+		Para ello hay que analizar el caso feliz y esos que rompen todo (la basura se esconde en los casos bordes, cuando se tiende a infinito, cuando es null o vacio). 
+	  
+		Ejemplo: se tiene la clase Intervalo y se desea probar:	boolean estaContenidoEnIntervaloCerradoCerrado(Integer dato, Integer cotaInferior, Integer cotaSuperior) {.....}
+	  
+			------------------------|------------------------|----------------------->
+								cotaInferior             cotaSuperior            +infinito
+	
+			Se buscan las posibles zonas del DOMINIO:
+				a. dato < cotaInferior
+				b. dato == cotaInferior
+				c. cotaInferior < dato && dato < cotaSuperior
+				d. dato == cotaSuperior
+				e. cotaSuperior < dato
+
+
+	3. Armar las evaluaciones de cada ZONA del DOMINIO. Para ello hay q preguntarse: q valor tendría q tener 'dato' para c/ZONA ? (SIEMPRE SE BUSCA EL PEOR DE LOS CASOS) 
+
+		Siguiendo con el Ejemplo anterior:
+	
+			Para a. dato quiero q tienda a -infinito (XQ BUSCO EL PEOR DE LOS CASOS) y también podría considerar q dato = cotaInferior - 1 (ya q es un valor q está pegado al borde)
+			Para b. dato == cotaInferior
+			Para c. dato = cotaInferior + 1 (ya q es un valor q está pegado al borde) && dato = cotaSuperior - 1 (ya q es un valor q está pegado al borde) 
+			Para d. dato == cotaSuperior
+			Para e. dato = cotaSuperior + 1 (ya q es un valor q está pegado al borde) && dato tiende a +infinito (XQ BUSCO EL PEOR DE LOS CASOS)
+	
